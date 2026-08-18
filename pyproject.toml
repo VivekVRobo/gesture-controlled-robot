@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gesture-controlled-robot"
+version = "0.1.0"
+description = "MediaPipe gesture controller and serial protocol for a differential-drive robot"
+requires-python = ">=3.10"
+authors = [{name = "Vivek Vala"}]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

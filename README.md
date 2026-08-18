@@ -1,74 +1,105 @@
 # Gesture Controlled Robot
 
-A computer-vision controlled differential-drive robot that maps simple hand gestures to motion commands.
+[![Python CI](https://github.com/vasu4990/gesture-controlled-robot/actions/workflows/python.yml/badge.svg)](https://github.com/vasu4990/gesture-controlled-robot/actions/workflows/python.yml)
 
-> **Status:** software reference implementation ready for camera + serial integration. Robot-specific serial port, motor pins, motor polarity, and safety limits must be adjusted for the physical platform.
+A webcam-driven differential-drive robot controller using MediaPipe hand landmarks on the host computer and a small watchdog-protected Arduino receiver on the robot.
 
-## What it does
+> **Status:** software stack complete as a reference implementation; serial port, pin mapping, motor direction, camera placement, and gesture thresholds require validation on the target hardware.
 
-- Uses a webcam and MediaPipe Hands to detect one hand
-- Converts finger states into a small command set
-- Sends compact serial commands to a microcontroller
-- Stops automatically when no valid hand is detected
-- Keeps vision and motor control separated for easier debugging
+## System overview
+
+```mermaid
+flowchart LR
+    C[Webcam] --> MP[MediaPipe hand landmarks]
+    MP --> G[Finger-state classifier]
+    G --> P[Command protocol]
+    P --> S[USB / serial link]
+    S --> A[Arduino receiver]
+    A --> H[Dual H-bridge]
+    H --> M[Left + right motors]
+    A --> W[500 ms watchdog]
+    W --> H
+```
 
 ## Gesture map
 
-| Gesture | Command |
-|---|---|
-| Open palm | Forward |
-| Fist | Stop |
-| Index finger only | Left |
-| Index + middle | Right |
-| Thumb only | Reverse |
+This reference classifier intentionally uses only the four non-thumb fingers so it is less sensitive to left/right hand orientation:
 
-## Architecture
+| Extended fingers | Command |
+|---:|---|
+| 0 | Stop |
+| 1 | Turn left |
+| 2 | Turn right |
+| 3 | Reverse |
+| 4 | Forward |
 
-```text
-Webcam → MediaPipe → gesture classifier → serial command
-                                      ↓
-                                Arduino/MCU
-                                      ↓
-                                 motor driver
-                                      ↓
-                              differential drive
-```
+The UI overlays the detected command on the camera feed. Press `q` to quit.
 
-## Desktop setup
+## Quick start
 
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
-python vision_control.py --port COM5
 ```
 
-Use `--dry-run` to test gesture detection without a robot connected.
+Run without robot hardware first:
 
-## Serial protocol
+```bash
+python vision_control.py --dry-run
+```
 
-Single ASCII characters followed by newline:
+Then connect a programmed Arduino and run, for example:
 
-- `F` forward
-- `B` backward
-- `L` turn left
-- `R` turn right
-- `S` stop
+```bash
+python vision_control.py --port COM5
+# Linux example: --port /dev/ttyACM0
+```
 
-The receiver should implement a watchdog so the robot stops if commands stop arriving.
+## Firmware
+
+Upload [`firmware/robot_receiver/robot_receiver.ino`](firmware/robot_receiver/robot_receiver.ino) and verify the pin map in [`docs/HARDWARE.md`](docs/HARDWARE.md). The firmware accepts one-character commands terminated by a newline:
+
+```text
+F = forward
+B = reverse
+L = left
+R = right
+S = stop
+```
+
+If valid commands stop arriving for 500 ms, the receiver stops both motors.
+
+## Repository layout
+
+```text
+.
+├── src/gesture_robot/
+│   ├── app.py
+│   ├── gestures.py
+│   └── protocol.py
+├── firmware/robot_receiver/robot_receiver.ino
+├── tests/
+├── docs/
+├── vision_control.py
+├── pyproject.toml
+└── requirements.txt
+```
+
+## Testing
+
+```bash
+pip install -e .
+pytest -q
+```
+
+The unit tests cover the gesture-to-command mapping and serial protocol encoding without requiring a camera or robot.
 
 ## Safety
 
-Always test with wheels off the ground first. The firmware should default to STOP on startup, malformed data, or communications timeout.
+Start in `--dry-run`. When connecting hardware, lift the wheels first, keep a physical power disconnect accessible, and verify `S` and watchdog behavior before floor testing.
 
-## Roadmap
+## License
 
-- [x] Hand landmark detection
-- [x] Gesture-to-command classifier
-- [x] Serial transport
-- [x] Dry-run mode
-- [ ] Physical robot calibration
-- [ ] Speed gestures
-- [ ] Obstacle-stop layer
-- [ ] Demo video and measured latency
+MIT — see [`LICENSE`](LICENSE).
