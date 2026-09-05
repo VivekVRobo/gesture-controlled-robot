@@ -1,6 +1,6 @@
 # Gesture Controlled Robot
 
-[![Python CI](https://github.com/vasu4990/gesture-controlled-robot/actions/workflows/python.yml/badge.svg)](https://github.com/vasu4990/gesture-controlled-robot/actions/workflows/python.yml)
+[![Python CI](https://github.com/VivekVRobo/gesture-controlled-robot/actions/workflows/python.yml/badge.svg)](https://github.com/VivekVRobo/gesture-controlled-robot/actions/workflows/python.yml)
 
 A webcam-driven differential-drive robot controller using MediaPipe hand landmarks on the host computer and a small watchdog-protected Arduino receiver on the robot.
 
