@@ -4,11 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gesture-controlled-robot"
-version = "0.1.0"
-description = "MediaPipe gesture controller and serial protocol for a differential-drive robot"
+version = "0.2.0"
+description = "MediaPipe gesture controller with orientation-aware geometry, fail-safe temporal stabilization, and serial robot control"
 requires-python = ">=3.10"
 authors = [{name = "Vivek Vala"}]
-dependencies = []
+dependencies = [
+  "opencv-python>=4.8,<5",
+  "mediapipe>=0.10,<0.11",
+  "pyserial>=3.5,<4",
+]
+
+[project.scripts]
+gesture-controlled-robot = "gesture_robot.app:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]
