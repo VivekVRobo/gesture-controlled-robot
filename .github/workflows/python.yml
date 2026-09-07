@@ -15,4 +15,26 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -e . pytest
       - run: pytest -q
-      - run: python -m compileall -q src vision_control.py
+      - run: python -m compileall -q src tools vision_control.py
+      - name: Generate deterministic gesture safety evidence
+        run: python tools/synthetic_gesture_evidence.py --output artifacts/synthetic-gesture-evidence.json
+      - name: Verify evidence boundaries and fail-safe behavior
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('artifacts/synthetic-gesture-evidence.json').read_text())
+          assert report['hardware_evidence'] is False
+          assert report['real_camera_dataset'] is False
+          assert report['geometry']['cases'] == 120
+          assert report['geometry']['accuracy'] == 1.0
+          assert report['stabilization']['single_frame_glitches_suppressed'] is True
+          assert report['stabilization']['hand_loss_stops_immediately'] is True
+          print('gesture software-evidence boundary: PASS')
+          PY
+      - name: Upload gesture software evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gesture-controller-software-evidence
+          path: artifacts/synthetic-gesture-evidence.json
+          if-no-files-found: error
