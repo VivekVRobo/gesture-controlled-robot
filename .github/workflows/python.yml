@@ -1,11 +1,12 @@
-name: Python CI
+name: Engineering CI
 
 on:
   push:
   pull_request:
 
 jobs:
-  test:
+  python:
+    name: Python controller + evidence
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +39,25 @@ jobs:
           name: gesture-controller-software-evidence
           path: artifacts/synthetic-gesture-evidence.json
           if-no-files-found: error
+
+  firmware:
+    name: Arduino Uno firmware compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.x'
+      - name: Install Arduino AVR core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+      - name: Prepare legacy receiver sketch
+        run: |
+          mkdir -p /tmp/gesture_robot
+          cp firmware/gesture_robot.ino /tmp/gesture_robot/gesture_robot.ino
+      - name: Compile primary receiver for Arduino Uno
+        run: arduino-cli compile --fqbn arduino:avr:uno firmware/robot_receiver
+      - name: Compile legacy receiver for Arduino Uno
+        run: arduino-cli compile --fqbn arduino:avr:uno /tmp/gesture_robot
