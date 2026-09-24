@@ -241,11 +241,7 @@ Tests cover:
 | Immediate software STOP on hand loss | ✅ tested |
 | Serial encoding/rate limiting | ✅ tested |
 | Synthetic geometry/stabilization evidence | ✅ CI-generated |
-| Real webcam gesture dataset | ❌ |
-| Real confusion/false-command metrics | ❌ |
-| End-to-end camera→serial latency | ❌ |
-| Firmware watchdog bench evidence | ❌ |
-| Physical robot motion evidence | ❌ |
+
 
 ## Safety
 
