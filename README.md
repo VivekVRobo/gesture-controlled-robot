@@ -1,34 +1,34 @@
-# Gesture Controlled Robot
+# Vision-Gesture Mobile Robot
 
 [![Python CI](https://github.com/VivekVRobo/gesture-controlled-robot/actions/workflows/python.yml/badge.svg)](https://github.com/VivekVRobo/gesture-controlled-robot/actions/workflows/python.yml)
 
-A webcam-driven differential-drive robot controller using MediaPipe hand landmarks, orientation-aware non-thumb finger geometry, fail-safe temporal command stabilization, and a watchdog-protected Arduino receiver.
+A **webcam-controlled differential-drive mobile robot** using MediaPipe hand landmarks, orientation-aware gesture geometry, temporal command stabilization, serial control, and an Arduino-side watchdog.
 
-> **Status:** software stack complete as a reference implementation with deterministic geometry/stabilization evidence. Real-camera recognition accuracy, end-to-end latency, serial reliability, motor direction, and robot motion remain hardware/evidence-gated.
+> This is the **mobile-robot vision/control project**. For my physical wearable-controlled robotic arm, see [gesture-controlled-robotic-arm](https://github.com/VivekVRobo/gesture-controlled-robotic-arm).
 
-## Project snapshot
+> **Current status:** software/reference implementation validated with deterministic synthetic evidence. Real-camera recognition accuracy, end-to-end latency, serial reliability, motor direction, and physical robot motion remain unmeasured.
 
-| | |
-|---|---|
-| **Perception** | MediaPipe hand landmarks |
-| **Gesture classifier** | PIP joint angle + wrist-distance geometry for four non-thumb fingers |
-| **Command safety** | Motion commands require consecutive stable frames; STOP and hand-loss STOP are immediate |
-| **Transport** | Rate-limited serial command sender |
-| **Robot fail-safe** | Arduino receiver stops motors if valid commands disappear for 500 ms |
-| **Software evidence** | 120 synthetic landmark rotation cases + command-jitter/hand-loss sequence in CI |
-| **Current maturity** | software reference; real camera/serial/robot timing and accuracy remain unmeasured |
+## Recruiter quick scan
 
-## System overview
+| Area | Current implementation |
+| --- | --- |
+| Perception | MediaPipe hand landmarks |
+| Gesture logic | Orientation-aware PIP joint + wrist-distance geometry |
+| Safety behavior | Stable-frame gating for motion; STOP and hand-loss STOP are immediate |
+| Transport | Rate-limited serial commands |
+| Firmware fail-safe | Arduino stops motors if valid commands disappear for 500 ms |
+| Software evidence | 120 deterministic landmark-rotation cases + transition/jitter tests in CI |
+| Physical evidence | Pending |
+
+## System path
 
 ```mermaid
 flowchart LR
-    C[Webcam] --> MP[MediaPipe hand landmarks]
-    MP --> G[Orientation-aware finger geometry]
-    G --> RAW[Raw gesture command]
-    RAW --> ST[Temporal motion stabilizer]
-    ST --> P[Rate-limited serial protocol]
-    P --> S[USB / serial link]
-    S --> A[Arduino receiver]
+    C[Webcam] --> MP[MediaPipe landmarks]
+    MP --> G[Gesture geometry]
+    G --> ST[Temporal stabilizer]
+    ST --> P[Serial protocol]
+    P --> A[Arduino receiver]
     A --> H[Dual H-bridge]
     H --> M[Left + right motors]
     A --> W[500 ms watchdog]
@@ -37,65 +37,32 @@ flowchart LR
 
 ## Gesture map
 
-The reference classifier uses only the four non-thumb fingers:
-
-| Extended fingers | Command |
-|---:|---|
+| Extended non-thumb fingers | Command |
+| ---: | --- |
 | 0 | Stop |
 | 1 | Turn left |
 | 2 | Turn right |
 | 3 | Reverse |
 | 4 | Forward |
 
-Thumb geometry is intentionally excluded to reduce handedness dependence.
+The implementation avoids a simple `tip.y < PIP.y` rule because that breaks when the hand rotates in the image. Instead it combines joint geometry with wrist-distance relationships so the **ideal landmark construction** is less sensitive to in-plane rotation.
 
-## Why the classifier changed
+That does not imply real-camera invariance: occlusion, perspective, blur, lighting, landmark errors, and ambiguous poses still require real-data validation.
 
-A common beginner implementation labels a finger extended when:
+## Motion safety behavior
 
-```text
-tip.y < PIP.y
-```
+Movement commands are debounced across consecutive stable frames so one noisy classification does not immediately change robot motion.
 
-That assumes the fingers point upward in image coordinates. Rotating the hand can break the decision even when the finger itself stays straight.
-
-This repository instead checks:
+Safety-critical stop behavior is not delayed:
 
 ```text
-MCP → PIP → tip joint geometry
-         +
-wrist-to-tip distance relative to wrist-to-PIP distance
+closed-fist STOP       -> immediate STOP
+hand disappears        -> immediate STOP
+program exits          -> forced STOP command
+serial command loss    -> firmware watchdog stops motors after 500 ms
 ```
 
-The ideal landmark decision is therefore invariant to simple in-plane rotation. Perspective, occlusion, MediaPipe errors and real camera conditions still require real-data validation.
-
-## Motion stabilization and STOP behavior
-
-A single misclassified frame should not instantly change robot motion.
-
-Default behavior:
-
-```text
-new movement gesture
-    ↓
-frame 1 ─┐
-frame 2  │ hold current output
-frame 3  │
-frame 4 ─┘
-    ↓
-accept movement command
-```
-
-But safety-critical STOP is different:
-
-```text
-closed-fist STOP → STOP immediately
-hand disappears   → STOP immediately
-program exits      → forced STOP command
-serial commands stop → firmware watchdog stops motors after 500 ms
-```
-
-Temporal smoothing is never allowed to delay a stop.
+Computer vision is not treated as a physical emergency-stop mechanism. Real hardware testing should keep a separate power disconnect available.
 
 ## Quick start
 
@@ -106,7 +73,7 @@ python -m venv .venv
 pip install -e .
 ```
 
-Run without robot hardware first:
+Dry-run first:
 
 ```bash
 gesture-controlled-robot --dry-run
@@ -118,34 +85,16 @@ or:
 python vision_control.py --dry-run
 ```
 
-Control the motion debounce:
-
-```bash
-gesture-controlled-robot --dry-run --stable-frames 4
-```
-
-Then connect a programmed Arduino and run, for example:
+With an Arduino receiver connected:
 
 ```bash
 gesture-controlled-robot --port COM5
 # Linux example: --port /dev/ttyACM0
 ```
 
-## Firmware
+Firmware lives at:
 
-Upload [`firmware/robot_receiver/robot_receiver.ino`](firmware/robot_receiver/robot_receiver.ino) and verify the pin map in [`docs/HARDWARE.md`](docs/HARDWARE.md).
-
-The firmware accepts newline-terminated commands:
-
-```text
-F = forward
-B = reverse
-L = left
-R = right
-S = stop
-```
-
-If valid commands stop arriving for 500 ms, the receiver stops both motors.
+[`firmware/robot_receiver/robot_receiver.ino`](firmware/robot_receiver/robot_receiver.ino)
 
 ## Deterministic software evidence
 
@@ -155,22 +104,16 @@ Run:
 python tools/synthetic_gesture_evidence.py
 ```
 
-Output:
-
-```text
-artifacts/synthetic-gesture-evidence.json
-```
-
-The current synthetic suite checks:
+The suite evaluates:
 
 - 5 extended-finger counts;
-- 24 in-plane rotations from 0° to 345° in 15° increments;
-- **120 total ideal-landmark geometry cases**;
-- single-frame LEFT/REVERSE glitches during a stable FORWARD command;
-- a legitimate stable command transition;
+- 24 in-plane rotations from 0° to 345°;
+- 120 ideal-landmark geometry cases;
+- single-frame command glitches;
+- a stable legitimate command transition;
 - immediate STOP on hand loss.
 
-The report carries explicit boundaries:
+Generated evidence explicitly records:
 
 ```text
 evidence_type: synthetic_gesture_geometry_and_stabilization_validation
@@ -178,43 +121,7 @@ hardware_evidence: false
 real_camera_dataset: false
 ```
 
-CI regenerates and uploads this evidence on relevant commits.
-
-A 100% synthetic geometry score means the ideal mathematical landmark construction behaves as intended. It does **not** mean 100% MediaPipe/webcam gesture recognition accuracy.
-
-## What real evidence should eventually measure
-
-A representative camera evaluation should capture labeled clips or frames across:
-
-- different hand orientations;
-- left and right hands;
-- distance from camera;
-- lighting levels;
-- partial occlusions;
-- cluttered backgrounds;
-- motion blur;
-- transition gestures.
-
-Useful metrics would include gesture confusion, false motion-command rate, stop-detection rate, stabilization latency in frames/ms, camera-to-serial command latency, watchdog behavior and physical command-to-motion latency.
-
-## Repository layout
-
-```text
-.
-├── src/gesture_robot/
-│   ├── app.py
-│   ├── gestures.py
-│   ├── stabilizer.py
-│   └── protocol.py
-├── tools/
-│   └── synthetic_gesture_evidence.py
-├── firmware/robot_receiver/robot_receiver.ino
-├── tests/
-├── docs/
-├── vision_control.py
-├── pyproject.toml
-└── requirements.txt
-```
+A perfect synthetic score validates the deterministic software contract only. It does **not** mean 100% real-world recognition accuracy.
 
 ## Testing
 
@@ -223,35 +130,43 @@ pip install -e . pytest
 pytest -q
 ```
 
-Tests cover:
-
-- gesture-to-command mapping;
-- orientation-aware ideal landmark classification;
-- temporal motion stabilization;
-- immediate STOP and hand-loss STOP behavior;
-- serial protocol encoding.
+Tests cover gesture mapping, orientation-aware ideal-landmark classification, temporal stabilization, immediate STOP behavior, hand-loss handling, and serial command encoding.
 
 ## Evidence maturity
 
-| Gate | Current |
-|---|---|
+| Gate | State |
+| --- | --- |
 | Command mapping | ✅ tested |
-| Orientation-aware ideal landmark geometry | ✅ tested |
-| Temporal motion stabilization | ✅ tested |
-| Immediate software STOP on hand loss | ✅ tested |
+| Ideal landmark geometry | ✅ tested |
+| Temporal stabilization | ✅ tested |
+| Immediate software STOP | ✅ tested |
 | Serial encoding/rate limiting | ✅ tested |
-| Synthetic geometry/stabilization evidence | ✅ CI-generated |
+| Synthetic evidence artifact | ✅ CI-generated |
+| Real-camera confusion matrix | ❌ pending |
+| Camera-to-command latency | ❌ pending |
+| Serial reliability | ❌ pending |
+| Physical mobile-robot motion | ❌ pending |
+| End-to-end hardware latency | ❌ pending |
 
+## Next meaningful proof
 
-## Safety
+The next useful milestone is a real labeled camera dataset and a physical mobile-robot test, including confusion/error rates, stop detection, serial reliability, command-to-motion latency, watchdog behavior, and failure cases.
 
-Start in `--dry-run`. When connecting hardware, lift the wheels first, keep a physical power disconnect accessible, verify `S`, confirm motor direction, and deliberately test watchdog timeout before floor operation.
+## Repository structure
 
-Computer vision must not be treated as the sole emergency-stop mechanism for a moving robot.
+```text
+src/gesture_robot/
+├── app.py
+├── gestures.py
+├── stabilizer.py
+└── protocol.py
 
-## Limitations
-
-The classifier intentionally remains lightweight. Joint-angle geometry reduces simple in-plane orientation sensitivity, but it does not solve occlusion, extreme perspective, unreliable landmarks, fast motion, poor lighting or ambiguous hand poses. The four-finger count also encodes only five discrete commands and does not identify which specific fingers are extended.
+firmware/robot_receiver/robot_receiver.ino
+tools/synthetic_gesture_evidence.py
+tests/
+docs/
+vision_control.py
+```
 
 ## License
 
