@@ -92,7 +92,7 @@ def test_camera_open_failure_stops_and_closes_serial(monkeypatch):
     with pytest.raises(SystemExit, match="Could not open camera 0"):
         app.run()
 
-    assert serial_handle.writes == [b"S\\n"]
+    assert serial_handle.writes == [b"S\n"]
     assert serial_handle.closed
     assert capture.released
     assert state["windows_destroyed"]
