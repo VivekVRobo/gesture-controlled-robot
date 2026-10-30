@@ -36,22 +36,28 @@ def run() -> None:
     import mediapipe as mp
 
     serial_handle = None
-    if not args.dry_run:
-        if not args.port:
-            raise SystemExit("--port is required unless --dry-run is used")
-        import serial
-        serial_handle = serial.Serial(args.port, args.baud, timeout=0.1)
-
-    sender = CommandSender(serial_handle)
-    stabilizer = CommandStabilizer(stable_frames_required=args.stable_frames)
-    cap = cv2.VideoCapture(args.camera)
-    if not cap.isOpened():
-        raise SystemExit(f"Could not open camera {args.camera}")
-
-    hands_api = mp.solutions.hands
-    drawing = mp.solutions.drawing_utils
+    cap = None
+    sender = None
 
     try:
+        if not args.dry_run:
+            if not args.port:
+                raise SystemExit("--port is required unless --dry-run is used")
+            import serial
+
+            serial_handle = serial.Serial(args.port, args.baud, timeout=0.1)
+
+        # Establish the STOP path before camera initialization. If the camera
+        # cannot open, the serial connection must still be stopped and closed.
+        sender = CommandSender(serial_handle)
+        cap = cv2.VideoCapture(args.camera)
+        if not cap.isOpened():
+            raise SystemExit(f"Could not open camera {args.camera}")
+
+        hands_api = mp.solutions.hands
+        drawing = mp.solutions.drawing_utils
+        stabilizer = CommandStabilizer(stable_frames_required=args.stable_frames)
+
         with hands_api.Hands(
             max_num_hands=1,
             min_detection_confidence=args.detection_confidence,
@@ -98,12 +104,21 @@ def run() -> None:
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
     finally:
-        stabilizer.update(Command.STOP, hand_present=False)
-        sender.send(Command.STOP, force=True)
-        cap.release()
-        cv2.destroyAllWindows()
-        if serial_handle is not None:
-            serial_handle.close()
+        # Cleanup is deliberately nested: a failed STOP write must not prevent
+        # camera/window cleanup or closing the serial handle.
+        try:
+            if sender is not None:
+                sender.send(Command.STOP, force=True)
+        finally:
+            try:
+                if cap is not None:
+                    cap.release()
+            finally:
+                try:
+                    cv2.destroyAllWindows()
+                finally:
+                    if serial_handle is not None:
+                        serial_handle.close()
 
 
 if __name__ == "__main__":
