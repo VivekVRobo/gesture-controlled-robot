@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import sys
 
 import pytest
 
@@ -74,9 +75,9 @@ def configure_run(monkeypatch, *, camera_opened, fail_serial_write=False):
         tracking_confidence=0.6,
     )
 
-    monkeypatch.setitem(__import__("sys").modules, "cv2", fake_cv2)
-    monkeypatch.setitem(__import__("sys").modules, "mediapipe", fake_mp)
-    monkeypatch.setitem(__import__("sys").modules, "serial", fake_serial_module)
+    monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
+    monkeypatch.setitem(sys.modules, "mediapipe", fake_mp)
+    monkeypatch.setitem(sys.modules, "serial", fake_serial_module)
     monkeypatch.setattr(
         app,
         "build_parser",
