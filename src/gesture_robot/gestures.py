@@ -44,11 +44,18 @@ def command_from_extended_count(count: int) -> Command:
 
 
 def _xyz(landmark) -> tuple[float, float, float]:
-    return (
-        float(landmark.x),
-        float(landmark.y),
-        float(getattr(landmark, "z", 0.0)),
-    )
+    try:
+        coordinates = (
+            float(landmark.x),
+            float(landmark.y),
+            float(getattr(landmark, "z", 0.0)),
+        )
+    except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("hand landmark coordinates must be finite numeric values") from exc
+
+    if not all(math.isfinite(value) for value in coordinates):
+        raise ValueError("hand landmark coordinates must be finite numeric values")
+    return coordinates
 
 
 def _sub(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -111,6 +118,8 @@ def count_extended_fingers(hand_landmarks) -> int:
     """Count index/middle/ring/pinky using orientation-aware joint geometry.
 
     Thumb remains intentionally excluded so the command mapping does not depend
-    on handedness-specific thumb geometry.
+    on handedness-specific thumb geometry. Non-numeric or non-finite landmark
+    coordinates raise ValueError so invalid perception data cannot be silently
+    reinterpreted as a different motion command.
     """
     return sum(finger_extension_states(hand_landmarks))
