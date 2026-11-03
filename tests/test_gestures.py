@@ -50,6 +50,18 @@ def test_extended_finger_count_is_invariant_to_ideal_in_plane_rotation(extended_
     assert count_extended_fingers(hand) == extended_count
 
 
+@pytest.mark.parametrize("coordinate", ["x", "y", "z"])
+@pytest.mark.parametrize("invalid_value", [float("nan"), float("inf"), float("-inf"), None])
+def test_invalid_landmark_coordinates_are_rejected(coordinate, invalid_value):
+    # With three extended fingers, silently treating one bad PIP landmark as
+    # flexed would change REVERSE into a different motion command.
+    hand = make_hand(extended_count=3, rotation_deg=0)
+    setattr(hand.landmark[6], coordinate, invalid_value)
+
+    with pytest.raises(ValueError, match="finite numeric values"):
+        count_extended_fingers(hand)
+
+
 def test_invalid_count():
     with pytest.raises(ValueError):
         command_from_extended_count(5)
