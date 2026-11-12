@@ -31,7 +31,7 @@ FINGER_JOINTS = (
 
 def command_from_extended_count(count: int) -> Command:
     """Map the number of extended non-thumb fingers to a robot command."""
-    if isinstance(count, bool):
+    if type(count) is not int:
         raise ValueError("extended finger count must be an integer between 0 and 4")
     mapping = {
         0: Command.STOP,
