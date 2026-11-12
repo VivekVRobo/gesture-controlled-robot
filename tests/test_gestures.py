@@ -50,6 +50,7 @@ def test_extended_finger_count_is_invariant_to_ideal_in_plane_rotation(extended_
     assert count_extended_fingers(hand) == extended_count
 
 
-def test_invalid_count():
+@pytest.mark.parametrize("invalid_count", [-1, 5, True, False, 1.0, "1"])
+def test_invalid_count_rejected(invalid_count):
     with pytest.raises(ValueError):
-        command_from_extended_count(5)
+        command_from_extended_count(invalid_count)
