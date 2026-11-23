@@ -1,3 +1,4 @@
+import math
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -15,6 +16,10 @@ class CommandSender:
     min_interval_s: float = 0.08
     _last_command: Optional[Command] = None
     _last_sent_at: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.min_interval_s) or self.min_interval_s < 0:
+            raise ValueError("min_interval_s must be finite and >= 0")
 
     def send(self, command: Command, *, force: bool = False) -> bool:
         now = time.monotonic()
